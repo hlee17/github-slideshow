@@ -1,0 +1,434 @@
+---
+title: Associations between exercise-related SNPs and the Baseline physical activity
+  phenotype
+author: "Harold Lee"
+date: "Sep 20, 2018"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+The aim of this analysis is to examine the association between genetic profile and physical activity phenotypes at baseline. 
+
+## Independent Variables
+```{r}
+# Three SNPS were identified by genome-wide association study (GWAS): rs978656, rs10887741, rs7299064.
+# One SNP was identified by candidate gene approach. This SNP is in brain derived neurotropic factor (BDNF) gene.
+
+#              0  1  2
+#- rs978656:   GG GA AA
+#- rs10887741: TT TC CC
+#- rs7299064:  TT TG GG
+#- rs6265:     GG GA AA
+
+```
+
+## Dependent variables
+```{r}
+
+# METs: total physical activity measured by an accelerometer
+# Exercise: >= 3 METs and >= 10 minutes in duration (consistent with the national guideline)
+# Paffenbarger: Self-reported physical activity questionnaire
+
+```
+
+## Covariates
+```{r}
+# Body Mass Index (BMI)
+# sex
+# Age
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(broom)
+library(knitr)
+library(dplyr)
+library(MASS)
+
+```
+
+C:\Users\Harold Lee\Documents\R\Look AHEAD\Original data\CSV data
+
+```{r}
+#This is the master database that has outcome and covariates
+LA<-read.csv(file="C:/Users/Harold Lee/Documents/R/Look AHEAD/Original data/CSV data/LA variables.csv", header = TRUE, sep = ",")
+
+# These three have genotype data
+LA.rs6265<-read.csv(file="C:/Users/Harold Lee/Documents/R/Look AHEAD/Original data/CSV data/LA rs6265.csv", header = TRUE, sep = ",")
+
+LA.metabochip<-read.csv(file="C:/Users/Harold Lee/Documents/R/Look AHEAD/Original data/CSV data/LA metoboCHIP rs978656 and rs10887741.csv", header = TRUE, sep = ",")
+
+LA.IBC<-read.csv(file="C:/Users/Harold Lee/Documents/R/Look AHEAD/Original data/CSV data/LA IBC_Chip rs7279064.csv", header = TRUE, sep = ",")
+
+names(LA)[names(LA) == "ï..PID"] <- "ID"
+names(LA.rs6265)[names(LA.rs6265) == "ï..PID"] <- "ID"
+names(LA.metabochip)[names(LA.metabochip) == "ï..PID"] <- "ID"
+names(LA.IBC)[names(LA.IBC) == "ï..PID"] <- "ID"
+
+LA1 <- merge(LA, LA.rs6265, by=c("ID")) 
+LA2 <- merge(LA1, LA.metabochip, by=c("ID"))
+LA3 <- merge(LA2, LA.IBC, by = c("ID"))
+
+LA4 <- subset(LA3, select = c( "ID","studysite" ,"tx", "female","hispanic", "race", "race.only", 
+"age_now_0", "bmi_0","bmi_1","bmi_4","mets_0", "mets_1","mets_4","exercise_0","exercise_1","exercise_4","paffenbarger_0","paffenbarger_1","paffenbarger_4","pca1","pca2","pca3","pca4","pca5","pca6","pca7","pca8","pca9","pca10","rs6265","rs978656", "rs10887741", "rs7279064"))
+
+names(LA4)[names(LA4) == "female"] <- "sex"
+names(LA4)[names(LA4) == "age_now_0"] <- "age"
+
+```
+
+```{R}
+LA5<- LA4[!is.na(LA4$rs6265),]
+LA6<- LA5[!is.na(LA5$rs978656),]
+LA7<- LA6[!is.na(LA6$rs10887741),]
+LA8<- LA7[!is.na(LA7$rs7279064),]
+LA_comp <- LA8[complete.cases(LA8),]
+
+```
+
+
+```{R}
+library(tableone)
+catvars <- c("studysite" ,"tx", "sex","hispanic", "race", "race.only", "rs6265","rs978656", "rs10887741", "rs7279064")
+convars <- c( "age", "bmi_0","bmi_1","bmi_4","mets_0","mets_1","mets_4","exercise_0","exercise_1","exercise_4","paffenbarger_0","paffenbarger_1","paffenbarger_4","pca1","pca2","pca3","pca4","pca5","pca6","pca7","pca8","pca9","pca10")
+```
+
+```{R}
+tab1_cat_raw <- CreateCatTable(vars = catvars, includeNA = TRUE,data = LA8)
+tab1_cat_raw
+```
+
+```{R}
+
+tab1_con_raw <- CreateContTable(vars = convars, data = LA8)
+tab1_con_raw
+
+```
+
+
+```{R}
+summary(LA8$mets_0)
+summary(LA8$mets_1)
+summary(LA8$mets_4)
+```
+
+```{R}
+summary(LA8$exercise_0)
+summary(LA8$exercise_1)
+summary(LA8$exercise_4)
+
+```
+
+
+```{R}
+summary(LA8$paffenbarger_0)
+summary(LA8$paffenbarger_1)
+summary(LA8$paffenbarger_4)
+
+```
+
+
+```{R}
+
+LA8$paffsen <- LA8$paffenbarger_0
+LA8$paffsen[is.na( LA8$paffsen)] <- 0
+LA8$paffsen <- ifelse(LA8$paffsen !=0,1,LA8$paffsen)
+
+summary(LA8$paffsen)
+```
+
+
+```{R}
+paff<-lm(paffsen ~ as.factor(studysite) + tx + sex + as.factor(race) +age,family = "binomial",  data = LA8)
+summary(paff)
+```
+
+
+```{R}
+
+LA8$exercisesen <- LA8$exercise_0
+LA8$exercisesen[is.na( LA8$exercisesen)] <- 0
+LA8$exercisesen <- ifelse(LA8$exercisesen !=0,1,LA8$exercisesen)
+
+summary(LA8$exercisesen)
+```
+
+```{R}
+ex<-lm(exercisesen ~ as.factor(studysite) + tx + sex + as.factor(race) +age, data = LA8)
+summary(ex)
+```
+
+```{R}
+
+tab1 <- CreateContTable(vars = c("exercise_0","paffenbarger_0"), strata = "studysite", data = LA8)
+tab1
+
+#study site: 3, 4, 12, 14, 16, 17
+#201+260+205+284+276+255 adds up to 1481
+
+```
+
+
+## Genotype variables
+   
+```{r}
+# Look AHEAD team coded the "# of minor allele" as below:
+#              0  1  2
+#- rs978656:   GG GA AA
+#- rs10887741: TT TC CC
+#- rs7299064:  TT TG GG
+#- rs6265:     GG GA AA
+
+# Minor allele and effect allele are different. Minor allele refers to the frequency of an allele in population, whereas effect allele refers to the allele that is predictive of the phenotype of interest, in this case, physical activity level.
+
+#Reverse coding for rs978656: this counts the number of effect allele for physical activity such that having one more effect allele is associated with engaging in more phyisical activity.
+
+LA$rs978656R  <- ifelse(LA$rs978656 == 2, 0, 
+                 ifelse(LA$rs978656 == 1, LA$rs978656,2))
+                 
+                 
+#Reverse coding for rs10887741: this counts the number of effect allele for physical activity such that having one more effect allele is associated with engaging in more phyisical activity.
+LA$rs10887741R  <- ifelse(LA$rs10887741 == 2, 0, 
+                   ifelse(LA$rs10887741 == 1, LA$rs10887741,2 ))
+                   
+
+#Domonant coding for BDNF rs6265. In prior literature, minor allele carriers (i.e., A allele carriers: GA and AA) were group together. This type of grouping is termed common recessive
+LA$rs6265rec  <- ifelse(LA$rs6265 == 2, 1, 
+                   ifelse(LA$rs6265 == 0, LA$rs6265,1 ))
+
+
+```
+
+#Exerciser Cumulative Genetic Risk Score (ECGS)
+Exerciser Cumulative Genetic Risk Score (ECGS) was calculated by adding the number of effect alleles, assuming an additive relationship between each four SNPs and physical activity. Each SNP has difference effect, thus this was weighted by effect size. 
+
+```{r}
+LA$W_ECGS <- LA$rs978656R*1.42 + LA$rs10887741R*1.32 + LA$rs7279064*1.36 + LA$rs6265*1.29
+LA$ECGS <- LA$rs978656R + LA$rs10887741R + LA$rs7279064 + LA$rs6265
+
+hist(LA$W_ECGS, breaks = 10)
+hist(LA$ECGS, breaks = 10)
+
+```
+
+## PA variables histogram
+```{R}
+
+hist(LA$mets_0, breaks = 10)
+# Exercise variable had many 0 values and thus tentatively excluded from further analysis
+hist(LA$exercise_0, breaks = 10)
+# Paffenbarger variable had many 0 values and thus tentatively excluded from further analysis
+hist(LA$paffenbarger_0, breaks = 10)
+hist(LA$bmi_0)
+```
+
+## PA variables histogram correlation tests 
+```{R}
+
+##Again, there were many 0 values in exercise and paffenbarger variable
+
+summary(LA$exercise_0)
+summary(LA$paffenbarger_0)
+
+##Regarless, I performed correlation test to see if there is any correlation between PA-related phenotypes.
+cor(LA$mets_0, LA$exercise_0, method = "pearson", use = "complete.obs")
+cor(LA$paffenbarger_0, LA$exercise_0, method = "pearson", use = "complete.obs")
+cor(LA$mets_0, LA$paffenbarger_0, method = "pearson", use = "complete.obs")
+
+##Although intensitied vary, PA phenotypes were generally inversely associated with BMI
+cor(LA$mets_0, LA$bmi_0, method = "pearson", use = "complete.obs")
+cor(LA$paffenbarger_0, LA$bmi_0, method = "pearson", use = "complete.obs")
+cor(LA$exercise_0, LA$bmi_0, method = "pearson", use = "complete.obs")
+```
+
+```{R}
+pairs(~ mets_0 + paffenbarger_0 + bmi_0 + exercise_0, data = LA)
+
+```
+
+```{r}
+
+library(corrplot)
+```
+
+```{r}
+library(dplyr)
+my_data <- LA %>% dplyr::select(mets_0, paffenbarger_0, bmi_0, exercise_0)
+
+```
+
+```{r}
+
+M<-cor(my_data)
+head(round(M,2))
+
+corrplot(M, method = "circle",type = "upper")
+corrplot(M, method = "number",type = "upper")
+``` 
+
+
+## Subject characteristics among ALL race
+```{R}
+library(tableone)
+catvars <- c("studysite", "sex", "race", "hispanic", "tx", "rs6265", "rs7279064", "rs978656R", "rs10887741R")
+
+
+taba <- CreateCatTable(vars = catvars, data = LA)
+taba
+
+
+convars <- c('age_0', 'bmi_0', 'mets_0',  'exercise_0', 'paffenbarger_0')
+
+tabb <- CreateContTable(vars = convars, data = LA)
+tabb
+
+```
+
+## We will include White only.
+```{R}
+
+#For the change in physical activity, distinguishing control and treatment group will be meaningful. However, for the baseline analysis, I will use the entire dataset to enhacne power to detect signals.
+#ILI<-subset(LA,tx==1)
+#CLT<-subset(LA,tx==0)
+
+# In terms of race, we will only include "white"
+LA.W<-subset(LA,race==4)
+```
+
+
+
+## Table 1: Subject characteristics among ONLY WHITE
+
+```{R}
+library(tableone)
+
+catvars <- c("studysite", "sex", "race", "hispanic", "tx", "rs6265", "rs7279064", "rs978656R", "rs10887741R")
+
+
+taba <- CreateCatTable(vars = catvars, data = LA.W)
+taba
+
+
+convars <- c('age_0', 'bmi_0', 'mets_0',  'exercise_0', 'paffenbarger_0')
+
+tabb <- CreateContTable(vars = convars, data = LA.W)
+tabb
+
+
+```
+
+## Table 2: Accelerometer-based physical activity by individual SNPs
+```{R}
+library(tableone)
+
+
+taba <- CreateContTable(vars = 'mets_0', strata = "rs6265",data = LA.W)
+taba
+
+taba1 <- CreateContTable(vars = 'mets_0', strata = "rs6265rec",data = LA.W)
+taba1
+
+tabb <- CreateContTable(vars = 'mets_0', strata = "rs7279064",data = LA.W)
+tabb
+
+tabc <- CreateContTable(vars ='mets_0', strata = "rs978656R",data = LA.W)
+tabc
+
+tabd <- CreateContTable(vars = 'mets_0', strata = "rs10887741R",data = LA.W)
+tabd
+
+```
+
+
+
+## Major analysis: Multiple Regression Model 
+```{r}  
+library(MASS)
+library(survey)
+
+# In the full, model, all covariates as well as possible interaction terms are included.  
+
+full.mod.met <- lm(mets_0 ~ W_ECGS + age_0 +bmi_0 + studysite +sex+ 
+        + W_ECGS*age_0 +W_ECGS*bmi_0 + W_ECGS*sex +
+        + age_0*bmi_0 +  age_0*sex+
+        + bmi_0*sex
+        + W_ECGS*age_0*bmi_0 + W_ECGS*sex*bmi_0
+        + W_ECGS*sex*age_0
+      
+        + W_ECGS*age_0*bmi_0*sex
+           , data=LA.W)
+
+```
+
+#AIC Model 
+I used AIC model to identify the most parsimonious model. The Akaike information criterion (AIC) is an estimator of the relative quality of statistical models for a given set of data. AIC offers an estimate of the relative information lost when a given model is used to represent the process that generated the data. In doing so, it deals with the trade-off between the goodness of fit of the model and the simplicity of the model.
+```{r}  
+#I went backwards to identify the most parsimonious model
+step.aic.mets<-stepAIC(full.mod.met, direction="backward", k=2)
+step.aic.mets
+```
+
+#Result of the AIC model
+```{r}  
+summary(step.aic.mets)
+```
+
+#Final model: Major findings
+The final model we obtained relied purely on statistical reasoning. I further removed variables that did not obtain statistical significance (p<0.05). This is because the purpose of this statistical analysis is to examine the relationship between genetic predispositions (i.e., ECGS) to physical activity (as opposed to identifying all possible predictors of physical activity behavior). Specifically, I removed age_0:bmi_0, age_0:sex, age_0:bmi_0:sex, and study site.
+```{r}  
+mets<-lm(formula = mets_0 ~ W_ECGS + age_0 + bmi_0 +  sex + 
+    W_ECGS:bmi_0 +  bmi_0:sex, 
+    data = LA.W)
+summary(mets)
+```
+
+Holding age, BMI, BMI x sex, W_ECGS x BMI constant, one unit increase in W_ECGS is associated with 0.22 increase in accelerometer-measured physical activity level. W_ECGS interacted with BMI such that the expected value of physical activity based on ECGS will be offset by BMI level; specifically, holding ECGS (and other aforementioned variables) constant, 10-unit increase in BMI is associated with 0.057 decrease in accelerometer-measured physical activity. 
+
+#Model fitting: log-transformed vs. non-log-transformed
+Log-transformation may improve model's fit.
+```{r}  
+mets<-lm(formula = mets_0 ~ W_ECGS + age_0 + bmi_0 +  sex + 
+    W_ECGS:bmi_0 +  bmi_0:sex, 
+    data = LA.W)
+summary(mets)
+```
+
+```{r}  
+metslg<-lm(formula = log(mets_0) ~ W_ECGS + age_0 + bmi_0 +  sex + 
+    W_ECGS:bmi_0 +  bmi_0:sex, 
+    data = LA.W)
+summary(metslg)
+```
+
+Log-transformation do improve the model but I am concerned with the trade-off. That is, after using log-transformation, interpretation of result (i.e., exponantiated beta coefficient) will no longer become intuitive. For example, in the log-transformed model, the beta coefficient obtained was 0.0598769. This beta coefficient has essentially no meaning before it is exponantiated. The exponantiated value is 1.061706 (=exp(0.0598769)). What this means is that "one unit increase in ECGS is associated with 6.1% increase in accelerometer-measure PA". To me, this compromise the clarity of the report. For this reason, I want to avoid log-transformation unless the non-log transformed model is fatally flawed. It seems its is not fatally flawed in this case.
+```{r}  
+# Before Log-transformation (I suggest that we use this version)
+plot(mets)
+
+```
+
+```{r}  
+# Before Log-transformation (I suggest that we use this version)
+plot(metslg)
+
+```
+
+#Individual SNPs and physical activity
+I examined each SNP and their association with physical activity level. In the full model, I included each individual SNP, covariates, as well as interaction terms. Then, I used AIC model to see whether individual SNP is selected. Only rs10887741 was significant predictor of physical activity. 
+
+#rs10887741: Final model based on AIC model & Harold's decision.
+```{r}  
+m<-lm(mets_0 ~ rs10887741 + age_0 + bmi_0 + 
+    sex + rs10887741:age_0 + rs10887741:bmi_0 +  
+     bmi_0:sex + rs10887741:age_0:bmi_0, data = LA.W)
+
+summary(m)
+```
+
+```{r}
+AIC(step.aic.mets)
+AIC(mets)
+
+```
